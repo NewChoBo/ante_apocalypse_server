@@ -1,6 +1,7 @@
 import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3, AbstractMesh, Ray } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
+import { WeaponRegistry } from './core/configs/WeaponConfig.ts';
 
 export class ServerGameController {
   private networkManager: ServerNetworkManager;
@@ -107,27 +108,34 @@ export class ServerGameController {
   }
 
   // [신규] 사격 판정 로직 (Raycast)
-  public processFireEvent(playerId: string, origin: any, direction: any) {
+  public processFireEvent(playerId: string, origin: any, direction: any, weaponIdOverride?: string) {
+    const playerState = this.networkManager.getPlayerState(playerId);
+    const weaponId = weaponIdOverride || playerState?.weaponId || 'Pistol';
+    const weaponStats = WeaponRegistry[weaponId] || WeaponRegistry['Pistol'];
+
     const rayOrigin = new Vector3(origin.x, origin.y, origin.z);
     const rayDir = new Vector3(direction.x, direction.y, direction.z);
-    const ray = new Ray(rayOrigin, rayDir, 100); // 사거리 100m
+    const ray = new Ray(rayOrigin, rayDir, weaponStats.range); 
 
-    // 서버 월드에서 레이 발사! (발사자 본인은 피격 대상에서 제외)
+    // 서버 월드에서 레이 발사! (발사자 본인은 피격 대상에서 제외 - AI 발사의 경우 sender(MasterClient)가 제외됨)
     const hitInfo = this.scene.pickWithRay(ray, (mesh) => {
       return mesh.metadata?.id !== playerId;
     });
 
     if (hitInfo && hitInfo.hit && hitInfo.pickedMesh) {
-      console.log(`[Server] 🎯 HIT! Shooter: ${playerId} -> Target: ${hitInfo.pickedMesh.name}`);
+      console.log(`[Server] 🎯 HIT! Shooter: ${playerId} (${weaponId}) -> Target: ${hitInfo.pickedMesh.name}`);
       
       // 맞은 대상이 플레이어라면 데미지 처리 방송
       if (hitInfo.pickedMesh.metadata?.isPlayer) {
           const targetId = hitInfo.pickedMesh.metadata.id;
-          // 여기서 데미지 계산 후 broadcastHit 호출 가능
-          this.networkManager.broadcastHit({ targetId, damage: 10, attackerId: playerId });
+          this.networkManager.broadcastHit({ 
+            targetId, 
+            damage: weaponStats.damage, 
+            attackerId: playerId 
+          });
       }
     } else {
-        console.log(`[Server] 💨 Miss by ${playerId}`);
+        console.log(`[Server] 💨 Miss by ${playerId} with ${weaponId}`);
     }
   }
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
+import { WeaponRegistry } from './core/configs/WeaponConfig.ts';
 
 export class ServerApi {
   private app: express.Application;
@@ -43,6 +44,10 @@ export class ServerApi {
         status: 'running',
         room: (this.networkManager as any).currentRoomName || 'Lobby'
       });
+    });
+
+    this.app.get('/weapon-config', (_req, res) => {
+      res.json(WeaponRegistry);
     });
   }
 

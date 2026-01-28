@@ -19,6 +19,8 @@ export enum EventCode {
   SPAWN_PICKUP = 18,
   DESTROY_PICKUP = 19,
   PLAYER_DEATH = 20,
+  REQ_WEAPON_CONFIGS = 21,
+  WEAPON_CONFIGS = 22,
 }
 
 export interface RoomInfo {

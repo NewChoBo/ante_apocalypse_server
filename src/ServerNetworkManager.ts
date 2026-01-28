@@ -1,5 +1,6 @@
 import Photon from 'photon-realtime';
 import { EventCode, PlayerState } from './core/network/NetworkProtocol.ts';
+import { WeaponRegistry } from './core/configs/WeaponConfig.ts';
 
 export class ServerNetworkManager {
   private client: any;
@@ -15,7 +16,11 @@ export class ServerNetworkManager {
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: any, rot: any) => void;
-  public onFireRequest?: (id: string, origin: any, dir: any) => void;
+  public onFireRequest?: (id: string, origin: any, dir: any, weaponId?: string) => void;
+
+  public getPlayerState(id: string): PlayerState | undefined {
+    return this.playerStates.get(id);
+  }
 
   constructor() {
     // LoadBalancingClient 생성
@@ -93,6 +98,9 @@ export class ServerNetworkManager {
 
   private handleEvent(code: number, data: any, senderId: string): void {
     switch (code) {
+      case EventCode.REQ_WEAPON_CONFIGS:
+        this.sendWeaponConfigs(senderId);
+        break;
       case EventCode.REQ_INITIAL_STATE:
         this.sendInitialState(senderId);
         break;
@@ -135,11 +143,20 @@ export class ServerNetworkManager {
           this.onFireRequest(
             senderId,
             data.muzzleTransform.position,
-            data.muzzleTransform.direction
+            data.muzzleTransform.direction,
+            data.weaponId // [신규] 무기 아이디 전달
           );
         }
         break;
     }
+  }
+
+  public sendWeaponConfigs(targetId: string): void {
+    this.client.raiseEvent(
+      EventCode.WEAPON_CONFIGS,
+      WeaponRegistry,
+      { targetActors: [parseInt(targetId)] }
+    );
   }
 
   private sendInitialState(targetId: string): void {
@@ -155,6 +172,7 @@ export class ServerNetworkManager {
         players: playerParams,
         enemies: enemyStates,
         targets: targetStates,
+        weaponConfigs: WeaponRegistry,
       },
       { targetActors: [parseInt(targetId)] }
     );
@@ -166,13 +184,14 @@ export class ServerNetworkManager {
     // 현재 모든 플레이어의 상태를 스냅샷으로 생성
     const playerParams: any[] = Array.from(this.playerStates.values());
     
-    // 월드 전체 상태 방송 (INITIAL_STATE 재활용)
+    // 월드 전체 상태 방송 (스냅샷 전송)
     this.client.raiseEvent(
       EventCode.INITIAL_STATE,
       {
         players: playerParams,
-        enemies: [], // 추후 적 상태 추가 가능
-        targets: [], // 추후 타겟 상태 추가 가능
+        enemies: [],
+        targets: [],
+        // weaponConfigs: WeaponRegistry, // [최적화] 매 프레임 보낼 필요 없음
       },
       { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
     );
