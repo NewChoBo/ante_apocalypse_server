@@ -4,7 +4,7 @@ import { EventCode, PlayerState } from './core/network/NetworkProtocol.ts';
 export class ServerNetworkManager {
   private client: any;
   private appId: string = process.env.VITE_PHOTON_APP_ID || ''; 
-  private appVersion: string = '1.0';
+  private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
   private playerStates: Map<string, PlayerState> = new Map();
 
