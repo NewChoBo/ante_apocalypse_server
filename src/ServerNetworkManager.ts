@@ -108,8 +108,27 @@ export class ServerNetworkManager {
   }
 
   public broadcastState(): void {
+    // 접속한 플레이어가 없으면 전송 중단
+    if (this.playerStates.size === 0) return;
+
     const players = Array.from(this.playerStates.values());
-    if (players.length === 0) return;
+    
+    // 모든 플레이어에게 'WORLD_STATE' (EventCode.MOVE를 재활용하거나 새로 정의) 전송
+    // 여기서는 단순히 각 플레이어의 위치 정보를 배열로 묶어서 보냅니다.
+    // 최적화를 위해 움직임이 있는 플레이어만 추려낼 수도 있습니다.
+    
+    const worldState = {
+        players: players,
+        timestamp: Date.now() // 클라이언트 예측 보정을 위한 시간값
+    };
+
+    // Photon의 raiseEvent를 사용하여 전파 (EventCode.move 사용 예시)
+    // 주의: 실제로는 개별 MOVE 이벤트보다, 압축된 'Snapshot' 이벤트를 하나 만드는 것이 좋습니다.
+    // 여기서는 기존 구조 호환을 위해 단순화했습니다.
+    
+    // *중요*: 서버가 마스터 클라이언트 역할이므로, 타겟을 'All'로 설정
+    this.client.raiseEvent(EventCode.INITIAL_STATE, worldState, { receivers: 0 }); 
+    // 참고: receivers: 0 은 All, 1은 Others. 서버 포함 모든 클라이언트 동기화가 필요함.
   }
 
   public disconnect(): void {
