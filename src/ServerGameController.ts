@@ -45,6 +45,12 @@ export class ServerGameController {
         // 4. 네트워크 상태 전파 (TickRate 조절 가능)
         this.networkManager.broadcastState(); 
     });
+
+    setTimeout(() => {
+      console.log("=== [Server] Creating Fixed Room: TEST_ROOM ==="); // 이 로그가 떠야 함
+      this.networkManager.createGameRoom("TEST_ROOM", "training_ground")
+          .catch((e) => console.error("Room creation failed:", e));
+    }, 1000);
   }
 
   public stop(): void {
