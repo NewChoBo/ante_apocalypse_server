@@ -11,6 +11,12 @@ export class ServerNetworkManager {
   // [추가] 연결 대기용 Promise Resolver
   private connectionResolver: (() => void) | null = null;
 
+  // [추가] 외부로 내보낼 콜백 함수들
+  public onPlayerJoin?: (id: string) => void;
+  public onPlayerLeave?: (id: string) => void;
+  public onPlayerMove?: (id: string, pos: any, rot: any) => void;
+  public onFireRequest?: (id: string, origin: any, dir: any) => void;
+
   constructor() {
     // LoadBalancingClient 생성
     this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
@@ -43,11 +49,15 @@ export class ServerNetworkManager {
 
     this.client.onActorJoin = (actor: any) => {
       console.log(`[ServerNetwork] Player Joined: ${actor.actorNr}`);
+      // [연결] 컨트롤러에게 알림
+      if (this.onPlayerJoin) this.onPlayerJoin(actor.actorNr.toString());
     };
 
     this.client.onActorLeave = (actor: any) => {
       console.log(`[ServerNetwork] Player Left: ${actor.actorNr}`);
       this.playerStates.delete(actor.actorNr.toString());
+      // [연결] 컨트롤러에게 알림
+      if (this.onPlayerLeave) this.onPlayerLeave(actor.actorNr.toString());
     };
   }
 
@@ -89,6 +99,8 @@ export class ServerNetworkManager {
 
       case EventCode.MOVE: {
         if (!this.playerStates.has(senderId)) {
+          // 플레이어 최초 발견 시에도 Hitbox 생성 요청
+          if (this.onPlayerJoin) this.onPlayerJoin(senderId);
           this.playerStates.set(senderId, {
             id: senderId,
             name: 'Unknown',
@@ -101,8 +113,32 @@ export class ServerNetworkManager {
         const state = this.playerStates.get(senderId)!;
         state.position = data.position;
         state.rotation = data.rotation;
+
+        // [연결] 컨트롤러에게 이동 알림 (Hitbox 이동)
+        if (this.onPlayerMove) {
+          this.onPlayerMove(senderId, data.position, data.rotation);
+        }
         break;
       }
+
+      case EventCode.SYNC_WEAPON: {
+        const state = this.playerStates.get(senderId);
+        if (state) {
+          state.weaponId = data.weaponId;
+        }
+        break;
+      }
+
+      case EventCode.FIRE:
+        // [연결] 컨트롤러에게 발사 알림 (Raycast 판정 요청)
+        if (this.onFireRequest && data.muzzleTransform) {
+          this.onFireRequest(
+            senderId,
+            data.muzzleTransform.position,
+            data.muzzleTransform.direction
+          );
+        }
+        break;
     }
   }
 
@@ -125,10 +161,50 @@ export class ServerNetworkManager {
   }
 
   public broadcastState(): void {
-    // 1단계에서 추가한 broadcast 로직 (아직 비어있다면 추가 필요)
     if (this.playerStates.size === 0) return;
-    const players = Array.from(this.playerStates.values());
-    // 구현 예: this.client.raiseEvent(EventCode.MOVE, { players }, ...);
+
+    // 현재 모든 플레이어의 상태를 스냅샷으로 생성
+    const playerParams: any[] = Array.from(this.playerStates.values());
+    
+    // 월드 전체 상태 방송 (INITIAL_STATE 재활용)
+    this.client.raiseEvent(
+      EventCode.INITIAL_STATE,
+      {
+        players: playerParams,
+        enemies: [], // 추후 적 상태 추가 가능
+        targets: [], // 추후 타겟 상태 추가 가능
+      },
+      { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
+    );
+  }
+
+  // [신규] 피격 결과 방송 (Broadcasting)
+  public broadcastHit(hitData: { targetId: string; damage: number; attackerId: string }): void {
+    // 서버측 상태 업데이트
+    const targetState = this.playerStates.get(hitData.targetId);
+    if (targetState) {
+      targetState.health = Math.max(0, targetState.health - hitData.damage);
+      console.log(`[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health}`);
+      
+      // 피격 정보 방송 (상태 포함)
+      this.client.raiseEvent(EventCode.HIT, {
+        ...hitData,
+        newHealth: targetState.health
+      }, { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All });
+
+      // 사망 처리
+      if (targetState.health <= 0) {
+        this.broadcastDeath(hitData.targetId, hitData.attackerId);
+      }
+    }
+  }
+
+  public broadcastDeath(playerId: string, attackerId: string): void {
+    console.log(`[ServerNetwork] 💀 Player ${playerId} was killed by ${attackerId}`);
+    this.client.raiseEvent(EventCode.PLAYER_DEATH, {
+      playerId,
+      attackerId
+    }, { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All });
   }
 
   public disconnect(): void {
