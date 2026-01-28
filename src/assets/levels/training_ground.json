@@ -1,0 +1,66 @@
+{
+  "ground": {
+    "width": 40,
+    "height": 60,
+    "material": { "diffuse": [0.2, 0.2, 0.22], "specular": [0.1, 0.1, 0.1] }
+  },
+  "playerSpawn": [0, 1.75, -25],
+  "enemySpawns": [],
+  "walls": [
+    {
+      "name": "backWall",
+      "position": [0, 3, 25],
+      "size": [40, 6, 0.5],
+      "material": { "diffuse": [0.3, 0.3, 0.32] }
+    },
+    {
+      "name": "leftWall",
+      "position": [-20, 3, 0],
+      "size": [0.55, 6, 60],
+      "material": { "diffuse": [0.3, 0.3, 0.32] }
+    },
+    {
+      "name": "rightWall",
+      "position": [20, 3, 0],
+      "size": [0.5, 6, 60],
+      "material": { "diffuse": [0.3, 0.3, 0.32] }
+    }
+  ],
+  "props": [
+    {
+      "type": "box",
+      "name": "lane0",
+      "position": [-14, 0.01, 5],
+      "size": [6, 0.02, 50],
+      "material": { "diffuse": [0.15, 0.15, 0.18] }
+    },
+    {
+      "type": "box",
+      "name": "lane1",
+      "position": [-7, 0.01, 5],
+      "size": [6, 0.02, 50],
+      "material": { "diffuse": [0.15, 0.15, 0.18] }
+    },
+    {
+      "type": "box",
+      "name": "lane2",
+      "position": [0, 0.01, 5],
+      "size": [6, 0.02, 50],
+      "material": { "diffuse": [0.15, 0.15, 0.18] }
+    },
+    {
+      "type": "box",
+      "name": "lane3",
+      "position": [7, 0.01, 5],
+      "size": [6, 0.02, 50],
+      "material": { "diffuse": [0.15, 0.15, 0.18] }
+    },
+    {
+      "type": "box",
+      "name": "lane4",
+      "position": [14, 0.01, 5],
+      "size": [6, 0.02, 50],
+      "material": { "diffuse": [0.15, 0.15, 0.18] }
+    }
+  ]
+}
